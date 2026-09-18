@@ -1,0 +1,548 @@
+/* リセット & 基本変数 */
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-light: #eff6ff;
+  --success: #10b981;
+  --success-bg: #ecfdf5;
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --radius: 14px;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  line-height: 1.5;
+  padding: 12px;
+}
+
+.app-container {
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ヘッダー */
+.app-header {
+  text-align: center;
+  padding: 16px 8px 8px;
+}
+
+.badge-tag {
+  display: inline-block;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  margin-bottom: 8px;
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* カード共通 */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+/* アップロードエリア */
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #93c5fd;
+  background: #f0f7ff;
+  border-radius: var(--radius);
+  padding: 32px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  text-align: center;
+  min-height: 140px;
+}
+
+.upload-dropzone:active,
+.upload-dropzone.dragover {
+  background: #dbeafe;
+  border-color: var(--primary);
+}
+
+.upload-icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.upload-text strong {
+  display: block;
+  font-size: 1.1rem;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.upload-text span {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.file-input {
+  display: none;
+}
+
+/* 元動画情報グリッド */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.info-item {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.info-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+
+/* プレビュー */
+.preview-wrapper {
+  width: 100%;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 10px 0 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 280px;
+}
+
+.video-preview {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  display: block;
+}
+
+/* 設定グループ */
+.setting-group {
+  margin-bottom: 18px;
+}
+
+.setting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.setting-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+/* 解像度数値入力 */
+.resolution-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.input-unit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-unit label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.input-unit input {
+  width: 100%;
+  height: 46px;
+  padding: 8px 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+
+.input-unit input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.res-multiplier {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  font-weight: bold;
+  padding-top: 18px;
+}
+
+/* プリセットボタン */
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn-preset {
+  flex: 1 1 calc(20% - 6px);
+  min-width: 70px;
+  height: 38px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-preset:hover,
+.btn-preset:active {
+  background: #e2e8f0;
+}
+
+.btn-preset.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ビットレート数値＆スライダー */
+.bitrate-val-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bitrate-val-display input {
+  width: 90px;
+  height: 36px;
+  text-align: right;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+}
+
+.bitrate-val-display input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.bitrate-val-display span {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  accent-color: var(--primary);
+  margin: 12px 0 6px;
+  cursor: pointer;
+}
+
+.slider-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.setting-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* オプション行 */
+.options-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.speed-select-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.speed-select-group select {
+  height: 36px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ボタン群 */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 52px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn-primary:active {
+  background: var(--primary-hover);
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  width: 100%;
+  height: 44px;
+  background: #f1f5f9;
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:active {
+  background: #e2e8f0;
+}
+
+.btn-download {
+  background: var(--success);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
+}
+
+.btn-download:active {
+  background: #059669;
+}
+
+/* 進捗カード */
+.progress-notice {
+  font-size: 0.8rem;
+  color: #d97706;
+  margin-bottom: 16px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 16px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  transition: width 0.15s ease-out;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+}
+
+/* 結果カード */
+.result-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.success-icon {
+  font-size: 2.5rem;
+  margin-bottom: 4px;
+}
+
+.result-header h2 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--success);
+}
+
+.comparison-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.comp-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.comp-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.comp-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.comp-arrow {
+  font-size: 1.4rem;
+  color: var(--text-muted);
+}
+
+.comp-col.highlight .comp-val {
+  color: var(--success);
+  font-size: 1.3rem;
+}
+
+.savings-badge {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 0.95rem;
+  margin-bottom: 14px;
+}
+
+/* 説明カード & フッター */
+.info-card {
+  background: #ffffff;
+}
+
+.info-card h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--primary);
+}
+
+.info-card p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.app-footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 12px 0 24px;
+}

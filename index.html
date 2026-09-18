@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>動画軽量化・変換ツール (通信量ゼロ・ブラウザ完結)</title>
+  <meta name="description" content="動画をサーバーにアップロードせず、スマホのブラウザ上だけで解像度やビットレートを変換・軽量化します。ギガ（通信量）消費ゼロ！">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- ヘッダー -->
+    <header class="app-header">
+      <div class="badge-tag">🔒 通信量ゼロ / 完全端末内処理</div>
+      <h1>動画軽量化コンバーター</h1>
+      <p class="subtitle">動画をサーバーに送信せず、スマホ内で安全＆高速に軽量化</p>
+    </header>
+
+    <!-- メインダッシュボード -->
+    <main class="dashboard">
+
+      <!-- 1. 動画選択エリア -->
+      <section class="card upload-card" id="uploadCard">
+        <label for="videoInput" class="upload-dropzone" id="dropzone">
+          <div class="upload-icon">🎬</div>
+          <div class="upload-text">
+            <strong>動画を選択する</strong>
+            <span>タップしてカメラロールまたはファイルから選択</span>
+          </div>
+          <input type="file" id="videoInput" accept="video/*" class="file-input">
+        </label>
+      </section>
+
+      <!-- 2. 動画情報 & パラメータ設定エリア（動画選択後に表示） -->
+      <section class="card settings-card" id="settingsCard" style="display: none;">
+        <h2 class="card-title">📊 元動画の情報</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">ファイルサイズ</span>
+            <span class="info-value" id="origSize">-</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">元の解像度</span>
+            <span class="info-value" id="origResolution">-</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">再生時間</span>
+            <span class="info-value" id="origDuration">-</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">推定ビットレート</span>
+            <span class="info-value" id="origBitrate">-</span>
+          </div>
+        </div>
+
+        <div class="preview-wrapper">
+          <video id="sourceVideo" playsinline muted controls class="video-preview"></video>
+        </div>
+
+        <hr class="divider">
+
+        <h2 class="card-title">⚙️ 軽量化・変換設定</h2>
+
+        <!-- 解像度設定（ピクセル指定） -->
+        <div class="setting-group">
+          <div class="setting-header">
+            <label class="setting-title">目標解像度 (ピクセル数)</label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="aspectRatioLock" checked>
+              <span>比率固定</span>
+            </label>
+          </div>
+
+          <div class="resolution-inputs">
+            <div class="input-unit">
+              <label for="targetWidth">幅 (px)</label>
+              <input type="number" id="targetWidth" inputmode="numeric" min="64" max="3840" step="2">
+            </div>
+            <span class="res-multiplier">✕</span>
+            <div class="input-unit">
+              <label for="targetHeight">高さ (px)</label>
+              <input type="number" id="targetHeight" inputmode="numeric" min="64" max="2160" step="2">
+            </div>
+          </div>
+
+          <!-- 解像度プリセットボタン -->
+          <div class="preset-buttons">
+            <button type="button" class="btn-preset" data-preset="1080">1080p</button>
+            <button type="button" class="btn-preset" data-preset="720">720p (推奨)</button>
+            <button type="button" class="btn-preset" data-preset="480">480p</button>
+            <button type="button" class="btn-preset" data-preset="360">360p (軽量)</button>
+            <button type="button" class="btn-preset" data-preset="half">50% 縮小</button>
+          </div>
+        </div>
+
+        <!-- ビットレート設定（kbps指定） -->
+        <div class="setting-group">
+          <div class="setting-header">
+            <label class="setting-title" for="targetBitrate">目標ビットレート</label>
+            <div class="bitrate-val-display">
+              <input type="number" id="bitrateInput" inputmode="numeric" min="100" max="20000" step="50">
+              <span>kbps</span>
+            </div>
+          </div>
+
+          <input type="range" id="bitrateSlider" min="200" max="8000" step="100" class="slider">
+
+          <div class="slider-marks">
+            <span>低 (500k)</span>
+            <span>中 (1500k: 推奨)</span>
+            <span>高 (3000k)</span>
+            <span>特高 (6000k)</span>
+          </div>
+
+          <p class="setting-hint">※ビットレートを下げるとファイルサイズが劇的に軽くなります。</p>
+        </div>
+
+        <!-- オプション設定 -->
+        <div class="setting-group options-row">
+          <label class="checkbox-label option-box">
+            <input type="checkbox" id="keepAudio" checked>
+            <span>音声を残す（OFFでさらに軽量化）</span>
+          </label>
+          <div class="speed-select-group">
+            <label for="speedSelect">変換速度:</label>
+            <select id="speedSelect">
+              <option value="1.0">等速 (1.0x - 最高安定)</option>
+              <option value="1.5" selected>高速 (1.5x - おすすめ)</option>
+              <option value="2.0">超高速 (2.0x)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 変換開始ボタン -->
+        <div class="action-buttons">
+          <button type="button" id="startBtn" class="btn-primary">
+            🚀 軽量化を開始する
+          </button>
+        </div>
+      </section>
+
+      <!-- 3. 処理中進捗エリア -->
+      <section class="card progress-card" id="progressCard" style="display: none;">
+        <h2 class="card-title">⏳ 動画を端末内で変換中...</h2>
+        <p class="progress-notice">※ブラウザを閉じたりバックグラウンドに移動しないでください</p>
+
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-stats">
+          <span id="progressPercentage">0%</span>
+          <span id="progressTime">00:00 / 00:00</span>
+        </div>
+
+        <button type="button" id="cancelBtn" class="btn-secondary">キャンセル</button>
+      </section>
+
+      <!-- 4. 変換結果・ダウンロードエリア -->
+      <section class="card result-card" id="resultCard" style="display: none;">
+        <div class="result-header">
+          <div class="success-icon">🎉</div>
+          <h2>変換が完了しました！</h2>
+        </div>
+
+        <div class="comparison-banner">
+          <div class="comp-col">
+            <span class="comp-label">変換前</span>
+            <span class="comp-val" id="beforeSize">-</span>
+          </div>
+          <div class="comp-arrow">➔</div>
+          <div class="comp-col highlight">
+            <span class="comp-label">変換後</span>
+            <span class="comp-val" id="afterSize">-</span>
+          </div>
+        </div>
+
+        <div class="savings-badge" id="savingsBadge">
+          削減率: <strong id="savingsPercent">0%</strong> 軽量化成功！
+        </div>
+
+        <div class="preview-wrapper">
+          <video id="resultVideo" playsinline controls class="video-preview"></video>
+        </div>
+
+        <div class="action-buttons">
+          <a id="downloadLink" download="compressed_video.mp4" class="btn-primary btn-download">
+            📥 軽量化動画を保存する
+          </a>
+          <button type="button" id="resetBtn" class="btn-secondary">
+            🔄 別の動画を変換する
+          </button>
+        </div>
+      </section>
+
+      <!-- アプリの特徴・仕組み説明 -->
+      <section class="card info-card">
+        <h3>💡 なぜギガ（通信量）を食わないの？</h3>
+        <p>このツールは最新のHTML5ブラウザ技術（Canvas & MediaRecorder）を使い、<strong>お使いのスマホ端末のプロセッサだけで直接動画をエンコード</strong>します。</p>
+        <p>一般的な動画変換サービスのように動画をインターネット上のサーバーに送信することが一切ないため、通信量を消費せず、プライベートな動画も安全に変換できます。</p>
+      </section>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="app-footer">
+      <p>© 2026 クライアントサイド動画軽量化ツール / GitHub Pages 対応</p>
+    </footer>
+  </div>
+
+  <!-- 非表示の作業用Canvas -->
+  <canvas id="renderCanvas" style="display: none;"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>

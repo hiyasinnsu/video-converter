@@ -1,0 +1,10 @@
+# Test video files
+*.mp4
+*.webm
+*.mov
+*.avi
+!test_sample.mp4
+
+# OS generated files
+.DS_Store
+Thumbs.db
