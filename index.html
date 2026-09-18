@@ -56,6 +56,16 @@
         <div class="preview-wrapper">
           <video id="sourceVideo" playsinline webkit-playsinline muted controls class="video-preview"></video>
         </div>
+        <div class="preview-speed-control">
+          <span class="preview-speed-label">プレビュー速度:</span>
+          <div class="speed-pill-group" data-target="sourceVideo">
+            <button type="button" class="btn-speed-pill" data-speed="0.25">0.25x</button>
+            <button type="button" class="btn-speed-pill" data-speed="0.5">0.5x</button>
+            <button type="button" class="btn-speed-pill active" data-speed="1.0">1.0x</button>
+            <button type="button" class="btn-speed-pill" data-speed="1.5">1.5x</button>
+            <button type="button" class="btn-speed-pill" data-speed="2.0">2.0x</button>
+          </div>
+        </div>
 
         <hr class="divider">
 
@@ -117,10 +127,8 @@
 
         <!-- オプション設定 -->
         <div class="setting-group options-row">
-          <label class="checkbox-label option-box">
-            <input type="checkbox" id="keepAudio" checked>
-            <span>音声を残す（OFFでさらに軽量化）</span>
-          </label>
+          <!-- 【修正理由】動画自体の再生速度（0.1x〜2.0x）を変更できるようにするため、選択肢を拡充 -->
+          <!--
           <div class="speed-select-group">
             <label for="speedSelect">変換速度:</label>
             <select id="speedSelect">
@@ -129,6 +137,26 @@
               <option value="2.0">超高速 (2.0x)</option>
             </select>
           </div>
+          -->
+          <div class="speed-select-group">
+            <label for="speedSelect" class="speed-label">🏃 再生速度 (出力動画):</label>
+            <select id="speedSelect" class="speed-select">
+              <option value="0.1">0.1x (超スロー・コマ送り風)</option>
+              <option value="0.25">0.25x (スロー・動作確認用)</option>
+              <option value="0.5">0.5x (2倍スロー)</option>
+              <option value="0.75">0.75x (やや遅め)</option>
+              <option value="1.0" selected>1.0x (通常速度・標準)</option>
+              <option value="1.25">1.25x (やや速め)</option>
+              <option value="1.5">1.5x (早送り・軽量化)</option>
+              <option value="2.0">2.0x (2倍速・大幅軽量化)</option>
+            </select>
+          </div>
+          <p class="speed-notice">※0.25倍速以下はブラウザ仕様により映像のみ（音声ミュート）となります</p>
+
+          <label class="checkbox-label option-box">
+            <input type="checkbox" id="keepAudio" checked>
+            <span>音声を残す（OFFでさらに軽量化）</span>
+          </label>
         </div>
 
         <!-- 保存ファイル名設定 -->
@@ -190,6 +218,16 @@
 
         <div class="preview-wrapper">
           <video id="resultVideo" playsinline webkit-playsinline controls class="video-preview"></video>
+        </div>
+        <div class="preview-speed-control">
+          <span class="preview-speed-label">プレビュー速度:</span>
+          <div class="speed-pill-group" data-target="resultVideo">
+            <button type="button" class="btn-speed-pill" data-speed="0.25">0.25x</button>
+            <button type="button" class="btn-speed-pill" data-speed="0.5">0.5x</button>
+            <button type="button" class="btn-speed-pill active" data-speed="1.0">1.0x</button>
+            <button type="button" class="btn-speed-pill" data-speed="1.5">1.5x</button>
+            <button type="button" class="btn-speed-pill" data-speed="2.0">2.0x</button>
+          </div>
         </div>
 
         <!-- 完了画面でのファイル名変更 -->

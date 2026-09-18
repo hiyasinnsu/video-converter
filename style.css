@@ -183,6 +183,53 @@ body {
   display: block;
 }
 
+/* プレビュー速度コントロール */
+.preview-speed-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
+.preview-speed-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.speed-pill-group {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-speed-pill {
+  border: none;
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.btn-speed-pill:hover,
+.btn-speed-pill:active {
+  background: #e2e8f0;
+}
+
+.btn-speed-pill.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
 /* 設定グループ */
 .setting-group {
   margin-bottom: 18px;
@@ -361,13 +408,20 @@ body {
 }
 
 .speed-select-group select {
-  height: 36px;
+  height: 38px;
   padding: 4px 8px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: #fff;
   font-size: 0.85rem;
   font-weight: 600;
+  max-width: 60%;
+}
+
+.speed-notice {
+  font-size: 0.73rem;
+  color: #d97706;
+  margin-top: -4px;
 }
 
 /* ファイル名入力グループ */

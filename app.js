@@ -226,6 +226,24 @@
     updateDownloadFileName();
   });
 
+  // --- プレビュー再生速度コントロール ---
+  const speedPills = document.querySelectorAll('.btn-speed-pill');
+  speedPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const parentGroup = pill.closest('.speed-pill-group');
+      const targetId = parentGroup ? parentGroup.dataset.target : null;
+      const targetVideo = targetId ? document.getElementById(targetId) : null;
+      const speed = parseFloat(pill.dataset.speed);
+
+      if (targetVideo && !isNaN(speed)) {
+        targetVideo.playbackRate = speed;
+        // 同一グループ内のアクティブクラス切り替え
+        parentGroup.querySelectorAll('.btn-speed-pill').forEach(btn => btn.classList.remove('active'));
+        pill.classList.add('active');
+      }
+    });
+  });
+
   // --- 解像度パラメータ連動 ---
   targetWidthInput.addEventListener('input', () => {
     let width = parseInt(targetWidthInput.value, 10);
@@ -327,8 +345,12 @@
     const targetHeight = makeEven(parseInt(targetHeightInput.value, 10) || 360);
     const targetBitrateKbps = parseInt(bitrateInput.value, 10) || 1200;
     const targetBitrateBps = targetBitrateKbps * 1000;
-    const keepAudio = keepAudioCheckbox.checked;
-    const playbackSpeed = parseFloat(speedSelect.value) || 1.5;
+    
+    // 【修正理由】0.1xや0.25xなどの超スロー再生時はブラウザ仕様で音声が停止するため、0.3未満は自動的に映像のみで処理するよう修正。またデフォルト速度を1.0xに変更。
+    // const keepAudio = keepAudioCheckbox.checked;
+    // const playbackSpeed = parseFloat(speedSelect.value) || 1.5;
+    const playbackSpeed = parseFloat(speedSelect.value) || 1.0;
+    const keepAudio = keepAudioCheckbox.checked && (playbackSpeed >= 0.3);
 
     const mimeType = getSupportedMimeType();
     if (!mimeType) {
