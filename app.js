@@ -60,7 +60,7 @@
 
   let isConverting = false;
   let mediaRecorder = null;
-  let recordedChunks = [];
+  let conversion = null;
   let animFrameId = null;
   let videoCallbackId = null;
   let activeStream = null;
@@ -73,7 +73,7 @@
   // --- ユーティリティ関数 ---
   function sanitizeFileName(name) {
     // OSで禁止されている文字 \ / : * ? " < > | を除去
-    return name.replace(/[\\/:*?"<>|]/g, '').trim();
+    return name.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim();
   }
 
   function updateDownloadFileName() {
@@ -84,6 +84,7 @@
     }
     // ユーザーが手動で拡張子を入力した場合の二重拡張子（.mp4.mp4等）を防止
     sanitized = sanitized.replace(new RegExp(`\\.${currentExtension}$`, 'i'), '');
+    sanitized = sanitized.replace(/[. ]+$/, '') || 'compressed_video';
     const finalName = `${sanitized}.${currentExtension}`;
     downloadLink.download = finalName;
   }
@@ -156,7 +157,13 @@
 
   // --- ファイル読み込み処理 ---
   function handleFileSelected(file) {
+    if (isConverting) return;
     originalFile = file;
+    originalDuration = 0;
+    sourceVideo.pause();
+    sourceVideo.muted = true;
+    resetPreviewSpeed(sourceVideo);
+    clearActivePresets();
 
     // 前回のURLがあれば解放
     if (originalVideoUrl) {
@@ -164,14 +171,18 @@
     }
     originalVideoUrl = URL.createObjectURL(file);
     sourceVideo.src = originalVideoUrl;
-    sourceVideo.load();
+
 
     origSizeEl.textContent = formatBytes(file.size);
 
     sourceVideo.onloadedmetadata = () => {
       originalWidth = sourceVideo.videoWidth;
       originalHeight = sourceVideo.videoHeight;
-      originalDuration = sourceVideo.duration || 1;
+      originalDuration = sourceVideo.duration;
+      if (!originalWidth || !originalHeight || !Number.isFinite(originalDuration) || originalDuration <= 0) {
+        sourceVideo.onerror();
+        return;
+      }
       originalAspectRatio = originalWidth / originalHeight;
 
       origResolutionEl.textContent = `${originalWidth} × ${originalHeight}`;
@@ -182,15 +193,15 @@
       const estimatedKbps = Math.round(estimatedBps / 1000);
       origBitrateEl.textContent = `${estimatedKbps.toLocaleString()} kbps`;
 
-      // 解像度の初期設定（1080p超なら720p推奨、それ以外は元サイズ）
+      // 解像度の初期設定（短辺720px超なら720p推奨）
       if (Math.min(originalWidth, originalHeight) > 720) {
         applyPreset('720');
       } else {
-        targetWidthInput.value = originalWidth;
-        targetHeightInput.value = originalHeight;
+        targetWidthInput.value = makeEven(originalWidth);
+        targetHeightInput.value = makeEven(originalHeight);
       }
 
-      // ビットレートの初期設定（元動画の半分程度、または1500kbpsを上限として推奨）
+      // ビットレートの初期設定（元動画の半分程度、または2000kbpsを上限として推奨）
       let initialBitrate = Math.min(Math.round(estimatedKbps * 0.5), 2000);
       if (initialBitrate < 400) initialBitrate = 400;
       setBitrate(initialBitrate);
@@ -214,6 +225,21 @@
       resultCard.style.display = 'none';
       progressCard.style.display = 'none';
     };
+    sourceVideo.onerror = () => {
+      originalDuration = 0;
+      settingsCard.style.display = 'none';
+      uploadCard.style.display = 'block';
+      videoInput.value = '';
+      alert('動画を読み込めません。ブラウザで再生できる動画を選択してください。');
+    };
+    sourceVideo.load();
+  }
+
+  function resetPreviewSpeed(video) {
+    video.playbackRate = 1;
+    document.querySelectorAll(`.speed-pill-group[data-target="${video.id}"] .btn-speed-pill`).forEach(pill => {
+      pill.classList.toggle('active', Number(pill.dataset.speed) === 1);
+    });
   }
 
   // --- ファイル名入力連動 ---
@@ -338,236 +364,205 @@
     }
   });
 
+  // 読み込み・シーク待ちをキャンセル時にも解除する。
+  function waitForVideo(eventName, signal) {
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        sourceVideo.removeEventListener(eventName, done);
+        sourceVideo.removeEventListener('error', failed);
+        signal.removeEventListener('abort', failed);
+      };
+      const done = () => { cleanup(); resolve(); };
+      const failed = () => { cleanup(); reject(new Error('動画の準備が中断されたか、読み込みに失敗しました。')); };
+      const timer = setTimeout(failed, 15000);
+      sourceVideo.addEventListener(eventName, done, { once: true });
+      sourceVideo.addEventListener('error', failed, { once: true });
+      signal.addEventListener('abort', failed, { once: true });
+    });
+  }
+
   // --- 変換処理（標準Web API方式） ---
   startBtn.addEventListener('click', async () => {
-    if (isConverting) return;
-
-    const targetWidth = makeEven(parseInt(targetWidthInput.value, 10) || 640);
-    const targetHeight = makeEven(parseInt(targetHeightInput.value, 10) || 360);
-    const targetBitrateKbps = parseInt(bitrateInput.value, 10) || 1200;
-    
-    // 【修正理由】0.1xや0.25xなどの超スロー再生時はブラウザ仕様で音声が停止するため、0.3未満は自動的に映像のみで処理するよう修正。またデフォルト速度を1.0xに変更。
-    // const keepAudio = keepAudioCheckbox.checked;
-    // const playbackSpeed = parseFloat(speedSelect.value) || 1.5;
-    const playbackSpeed = parseFloat(speedSelect.value) || 1.0;
-    const keepAudio = keepAudioCheckbox.checked && (playbackSpeed >= 0.3);
-
-    // 【修正理由】0.25xなどのスロー再生時は動画全体の秒数が何倍にも引き伸ばされるため、同じビットレートだとファイルサイズが何倍にも肥大化してしまう。そのため速度に応じて実効ビットレートを自動調整し、スロー時でもサイズ増加を防ぐ。
-    // const targetBitrateBps = targetBitrateKbps * 1000;
-    let effectiveBitrateBps = targetBitrateKbps * 1000;
-    if (playbackSpeed < 1.0) {
-      effectiveBitrateBps = Math.round(effectiveBitrateBps * playbackSpeed);
-      if (effectiveBitrateBps < 150000) effectiveBitrateBps = 150000; // 最低150kbps保証
-    }
-
-    const mimeType = getSupportedMimeType();
-    if (!mimeType) {
-      alert('申し訳ありません。お使いのブラウザでは動画エンコード機能（MediaRecorder）がサポートされていません。');
+    if (isConverting || !originalFile || !originalDuration) return;
+    const width = Number(targetWidthInput.value);
+    const height = Number(targetHeightInput.value);
+    const kbps = Number(bitrateInput.value);
+    const playbackSpeed = Number(speedSelect.value);
+    if (![width, height].every(v => Number.isInteger(v) && v >= 2 && v <= 3840) ||
+        !Number.isFinite(kbps) || kbps < 100 || kbps > 20000 ||
+        ![0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2].includes(playbackSpeed)) {
+      alert('解像度は2〜3840pxの整数、ビットレートは100〜20000kbpsで指定してください。');
       return;
     }
-
+    const mimeType = getSupportedMimeType();
+    if (!mimeType || typeof renderCanvas.captureStream !== 'function') {
+      alert('このブラウザは動画変換に必要な録画機能に対応していません。');
+      return;
+    }
+    const targetWidth = makeEven(width);
+    const targetHeight = makeEven(height);
+    targetWidthInput.value = targetWidth;
+    targetHeightInput.value = targetHeight;
+    const keepAudio = keepAudioCheckbox.checked && playbackSpeed >= 0.3;
+    // スロー時はサイズ増加を抑える。実際の出力サイズはエンコーダー依存。
+    const effectiveBitrateBps = playbackSpeed < 1
+      ? Math.max(150000, Math.round(kbps * 1000 * playbackSpeed)) : kbps * 1000;
+    const job = { chunks: [], cancelled: false, controller: new AbortController(), preview: sourceVideo.parentElement };
+    conversion = job;
     isConverting = true;
-    recordedChunks = [];
-
-    // UI切り替え
     settingsCard.style.display = 'none';
     progressCard.style.display = 'block';
     resultCard.style.display = 'none';
     progressBarFill.style.width = '0%';
     progressPercentage.textContent = '0%';
-    progressTime.textContent = `00:00 / ${formatSeconds(originalDuration)}`;
+    progressTime.textContent = `00:00 / ${formatSeconds(originalDuration / playbackSpeed)}`;
+    // 表示中の動画を使い、非表示動画へのフレームコールバック抑制を避ける。
+    progressCard.prepend(job.preview);
+    sourceVideo.controls = false;
+    sourceVideo.pause();
 
-    // Canvas準備
-    renderCanvas.width = targetWidth;
-    renderCanvas.height = targetHeight;
-    const ctx = renderCanvas.getContext('2d', { alpha: false });
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    // 映像ストリーム
-    // 【修正理由】canvas.captureStream(30)の固定タイマーだと描画タイミングとズレてコマ落ち・カクつき（ジッター）が発生するため、手動同期モード（captureStream(0) + requestFrame）を採用。
-    // const canvasStream = renderCanvas.captureStream(30);
-    let canvasStream;
-    let videoTrack = null;
     try {
-      canvasStream = renderCanvas.captureStream(0);
-      videoTrack = canvasStream.getVideoTracks()[0];
-    } catch (e) {
-      canvasStream = renderCanvas.captureStream(30);
-      videoTrack = null;
-    }
-
-    // 音声ストリームの取得と合成
-    let combinedStream = canvasStream;
-    if (keepAudio) {
-      try {
-        if (!audioContext) {
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          audioContext = new AudioContextClass();
-        }
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume();
-        }
-
-        if (!audioSourceNode) {
-          audioSourceNode = audioContext.createMediaElementSource(sourceVideo);
-        } else {
-          try {
-            audioSourceNode.disconnect();
-          } catch (e) {}
-        }
+      renderCanvas.width = targetWidth;
+      renderCanvas.height = targetHeight;
+      const ctx = renderCanvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('描画領域を準備できませんでした。');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      activeStream = renderCanvas.captureStream(0);
+      let videoTrack = activeStream.getVideoTracks()[0];
+      if (!videoTrack || typeof videoTrack.requestFrame !== 'function') {
+        activeStream.getTracks().forEach(track => track.stop());
+        activeStream = renderCanvas.captureStream(30);
+        videoTrack = null;
+      }
+      if (keepAudio) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error('音声の取得に対応していません。「音声を残す」をOFFにしてください。');
+        if (!audioContext) audioContext = new AudioContextClass();
+        if (!audioSourceNode) audioSourceNode = audioContext.createMediaElementSource(sourceVideo);
+        audioSourceNode.disconnect();
         audioDestination = audioContext.createMediaStreamDestination();
         audioSourceNode.connect(audioDestination);
-        // 音声をスピーカーに出力しないように destination のみに接続
-
-        const audioTrack = audioDestination.stream.getAudioTracks()[0];
-        if (audioTrack) {
-          combinedStream = new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            audioTrack
-          ]);
-        }
-      } catch (err) {
-        console.warn('音声トラックのキャプチャに失敗したため、映像のみでエンコードを継続します:', err);
+        audioDestination.stream.getAudioTracks().forEach(track => activeStream.addTrack(track));
+        await audioContext.resume();
+        if (job.cancelled) return;
+        if (audioContext.state !== 'running') throw new Error('音声処理を開始できませんでした。');
       }
-    }
-
-    activeStream = combinedStream;
-
-    // MediaRecorder設定
-    const recorderOptions = {
-      mimeType: mimeType,
-      videoBitsPerSecond: effectiveBitrateBps
-    };
-
-    try {
-      mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
-    } catch (e) {
-      console.warn('指定コーデックオプションでの初期化失敗、デフォルトフォールバックを試みます:', e);
-      mediaRecorder = new MediaRecorder(combinedStream);
-    }
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) {
-        recordedChunks.push(event.data);
+      sourceVideo.muted = !keepAudio;
+      sourceVideo.playbackRate = playbackSpeed;
+      if (sourceVideo.seeking || sourceVideo.currentTime !== 0) {
+        const seeked = waitForVideo('seeked', job.controller.signal);
+        sourceVideo.currentTime = 0;
+        await seeked;
       }
-    };
-
-    mediaRecorder.onstop = () => {
-      finishConversion(mimeType);
-    };
-
-    // スロー倍速時の1コマあたり均等フレーム数（例: 0.25xなら4フレーム均等に記録し、間隔のバラつきを根絶）
-    const repeatFramesPerSourceFrame = (playbackSpeed < 1.0)
-      ? Math.max(1, Math.round(1 / playbackSpeed))
-      : 1;
-
-    // 再生設定と描画ループ開始
-    sourceVideo.currentTime = 0;
-    sourceVideo.playbackRate = playbackSpeed;
-    sourceVideo.muted = false; // 音声抽出のためにミュート解除（AudioContextがスピーカーには繋がっていないため無音）
-
-    let isPlaying = false;
-
-    function renderLoop() {
-      if (!isConverting) return;
-
+      if (job.cancelled) return;
+      if (sourceVideo.readyState < 2) await waitForVideo('loadeddata', job.controller.signal);
+      if (job.cancelled) return;
       ctx.drawImage(sourceVideo, 0, 0, targetWidth, targetHeight);
-      
-      // 完全等間隔フレームリクエスト: 1コマ更新ごとにきっかり指定回数だけフレームをエンコーダーへ送信
-      if (videoTrack && typeof videoTrack.requestFrame === 'function') {
-        for (let i = 0; i < repeatFramesPerSourceFrame; i++) {
-          videoTrack.requestFrame();
+      try {
+        mediaRecorder = new MediaRecorder(activeStream, { mimeType, videoBitsPerSecond: effectiveBitrateBps });
+      } catch {
+        mediaRecorder = new MediaRecorder(activeStream, { videoBitsPerSecond: effectiveBitrateBps });
+      }
+      const recorder = mediaRecorder;
+      recorder.ondataavailable = event => {
+        if (!job.cancelled && event.data.size > 0) job.chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        if (conversion !== job) return;
+        const actualMime = recorder.mimeType || job.chunks[0]?.type;
+        const succeeded = !job.cancelled && job.chunks.length > 0 &&
+          /video\/(mp4|webm)/i.test(actualMime || '');
+        cleanupConversion();
+        if (succeeded) finishConversion(actualMime, job.chunks);
+        else {
+          settingsCard.style.display = 'block';
+          if (!job.cancelled) alert('録画データを生成できませんでした。設定を変更して再試行してください。');
         }
+        job.chunks.length = 0;
+      };
+      recorder.onerror = () => {
+        if (conversion === job) failConversion(new Error('録画中にエラーが発生しました。'));
+      };
+      sourceVideo.onerror = () => failConversion(new Error('動画の再生中にエラーが発生しました。'));
+      sourceVideo.onended = stopConversion;
+      const startedAt = performance.now();
+      function renderLoop() {
+        if (conversion !== job || job.cancelled) return;
+        try {
+          ctx.drawImage(sourceVideo, 0, 0, targetWidth, targetHeight);
+          // requestFrame は要求フラグであり、連続呼び出しで複数コマは生成できない。
+          if (videoTrack) videoTrack.requestFrame();
+          const pct = Math.min(99, Math.round(sourceVideo.currentTime / originalDuration * 100));
+          progressBarFill.style.width = `${pct}%`;
+          progressPercentage.textContent = `${pct}%`;
+          progressTime.textContent = `${formatSeconds((performance.now() - startedAt) / 1000)} / ${formatSeconds(originalDuration / playbackSpeed)}`;
+          if ('requestVideoFrameCallback' in sourceVideo) videoCallbackId = sourceVideo.requestVideoFrameCallback(renderLoop);
+          else animFrameId = requestAnimationFrame(renderLoop);
+        } catch (error) { failConversion(error); }
       }
-
-      // 進捗更新
-      const current = sourceVideo.currentTime;
-      const duration = originalDuration || 1;
-      const pct = Math.min(99, Math.round((current / duration) * 100));
-
-      progressBarFill.style.width = `${pct}%`;
-      progressPercentage.textContent = `${pct}%`;
-      progressTime.textContent = `${formatSeconds(current)} / ${formatSeconds(duration)}`;
-
-      if (sourceVideo.ended || current >= duration - 0.05) {
-        stopConversion();
-        return;
-      }
-
-      // 【修正理由】ブラウザの画面描画タイマー（requestAnimationFrame）に依存すると動画デコードのブレでコマごとの滞在時間がバラバラになるため、動画のコマ提示に厳密同期するrequestVideoFrameCallbackを最優先で使用
-      // animFrameId = requestAnimationFrame(renderLoop);
-      if ('requestVideoFrameCallback' in sourceVideo) {
-        videoCallbackId = sourceVideo.requestVideoFrameCallback(renderLoop);
-      } else {
-        animFrameId = requestAnimationFrame(renderLoop);
-      }
+      recorder.start(500);
+      renderLoop();
+      await sourceVideo.play();
+    } catch (error) {
+      if (conversion === job && !job.cancelled) failConversion(error);
     }
-
-    sourceVideo.onplay = () => {
-      isPlaying = true;
-      mediaRecorder.start(500); // 500ms単位でチャンク化
-      if ('requestVideoFrameCallback' in sourceVideo) {
-        videoCallbackId = sourceVideo.requestVideoFrameCallback(renderLoop);
-      } else {
-        animFrameId = requestAnimationFrame(renderLoop);
-      }
-    };
-
-    sourceVideo.onended = () => {
-      stopConversion();
-    };
-
-    sourceVideo.play().catch(err => {
-      console.error('動画の再生開始エラー:', err);
-      alert('動画の再生処理を開始できませんでした。');
-      cancelConversion();
-    });
   });
 
-  // 変換の通常停止
-  function stopConversion() {
-    if (!isConverting) return;
-    isConverting = false;
+  function releasePlayback() {
+    sourceVideo.onended = null;
+    sourceVideo.onerror = null;
     sourceVideo.pause();
-    if (animFrameId) cancelAnimationFrame(animFrameId);
-    if (videoCallbackId && 'cancelVideoFrameCallback' in sourceVideo) {
-      sourceVideo.cancelVideoFrameCallback(videoCallbackId);
-      videoCallbackId = null;
-    }
-    if (activeStream) {
-      activeStream.getTracks().forEach(track => track.stop());
-      activeStream = null;
-    }
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
+    sourceVideo.muted = true;
+    if (animFrameId !== null) cancelAnimationFrame(animFrameId);
+    if (videoCallbackId !== null && 'cancelVideoFrameCallback' in sourceVideo) sourceVideo.cancelVideoFrameCallback(videoCallbackId);
+    animFrameId = videoCallbackId = null;
   }
 
-  // キャンセル処理
-  function cancelConversion() {
+  function cleanupConversion() {
+    releasePlayback();
+    if (activeStream) activeStream.getTracks().forEach(track => track.stop());
+    if (audioSourceNode) audioSourceNode.disconnect();
+    if (audioDestination) audioDestination.stream.getTracks().forEach(track => track.stop());
+    audioDestination = activeStream = mediaRecorder = null;
+    if (conversion) {
+      settingsCard.insertBefore(conversion.preview, settingsCard.querySelector('.preview-speed-control'));
+      conversion.controller.abort();
+    }
+    sourceVideo.controls = true;
+    resetPreviewSpeed(sourceVideo);
+    conversion = null;
     isConverting = false;
-    sourceVideo.pause();
-    if (animFrameId) cancelAnimationFrame(animFrameId);
-    if (videoCallbackId && 'cancelVideoFrameCallback' in sourceVideo) {
-      sourceVideo.cancelVideoFrameCallback(videoCallbackId);
-      videoCallbackId = null;
-    }
-    if (activeStream) {
-      activeStream.getTracks().forEach(track => track.stop());
-      activeStream = null;
-    }
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
     progressCard.style.display = 'none';
+  }
+
+  function stopConversion() {
+    if (!conversion) return;
+    releasePlayback();
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  }
+
+  function cancelConversion() {
+    if (!conversion) return;
+    conversion.cancelled = true;
+    conversion.chunks.length = 0;
+    conversion.controller.abort();
+    stopConversion();
+    cleanupConversion();
     settingsCard.style.display = 'block';
+  }
+
+  function failConversion(error) {
+    console.error(error);
+    cancelConversion();
+    alert(error.message || '変換に失敗しました。設定を変更して再試行してください。');
   }
 
   cancelBtn.addEventListener('click', cancelConversion);
 
   // 変換完了時の処理
-  function finishConversion(mimeType) {
+  function finishConversion(mimeType, recordedChunks) {
     progressBarFill.style.width = '100%';
     progressPercentage.textContent = '100%';
 
@@ -594,10 +589,11 @@
     if (savingsPercent > 0) {
       savingsPercentEl.textContent = `${savingsPercent}%`;
     } else {
-      savingsPercentEl.textContent = `0% (元動画より高画質設定)`;
+      savingsPercentEl.textContent = `${Math.abs(Number(savingsPercent)).toFixed(1)}% 増加（設定や形式によりサイズは増えることがあります）`;
     }
 
     // 結果プレビュー
+    resetPreviewSpeed(resultVideo);
     resultVideo.src = outputBlobUrl;
 
     // ダウンロードボタン
@@ -606,9 +602,6 @@
     resultFileExtBadge.textContent = `.${currentExtension}`;
     downloadLink.href = outputBlobUrl;
     
-    // 【修正理由】ファイル名を自由に変更できるようにするため、固定ファイル名指定から updateDownloadFileName() 呼び出しに変更
-    // const baseName = originalFile.name.replace(/\.[^/.]+$/, '');
-    // downloadLink.download = `${baseName}_light.${extension}`;
     updateDownloadFileName();
 
     // 画面切り替え
@@ -621,10 +614,19 @@
     resultCard.style.display = 'none';
     uploadCard.style.display = 'block';
     videoInput.value = '';
-    sourceVideo.src = '';
-    resultVideo.src = '';
+    sourceVideo.pause();
+    resultVideo.pause();
+    sourceVideo.onloadedmetadata = sourceVideo.onerror = null;
+    sourceVideo.removeAttribute('src');
+    resultVideo.removeAttribute('src');
+    sourceVideo.load();
+    resultVideo.load();
+    originalFile = null;
+    originalDuration = 0;
+    downloadLink.removeAttribute('href');
     if (outputBlobUrl) URL.revokeObjectURL(outputBlobUrl);
     if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
+    outputBlobUrl = originalVideoUrl = null;
   });
 
 })();
