@@ -57,6 +57,7 @@
   let mediaRecorder = null;
   let recordedChunks = [];
   let animFrameId = null;
+  let activeStream = null;
   let audioContext = null;
   let audioDestination = null;
   let audioSourceNode = null;
@@ -323,6 +324,10 @@
 
         if (!audioSourceNode) {
           audioSourceNode = audioContext.createMediaElementSource(sourceVideo);
+        } else {
+          try {
+            audioSourceNode.disconnect();
+          } catch (e) {}
         }
         audioDestination = audioContext.createMediaStreamDestination();
         audioSourceNode.connect(audioDestination);
@@ -339,6 +344,8 @@
         console.warn('音声トラックのキャプチャに失敗したため、映像のみでエンコードを継続します:', err);
       }
     }
+
+    activeStream = combinedStream;
 
     // MediaRecorder設定
     const recorderOptions = {
@@ -423,6 +430,10 @@
     isConverting = false;
     sourceVideo.pause();
     if (animFrameId) cancelAnimationFrame(animFrameId);
+    if (activeStream) {
+      activeStream.getTracks().forEach(track => track.stop());
+      activeStream = null;
+    }
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
     }
@@ -433,6 +444,10 @@
     isConverting = false;
     sourceVideo.pause();
     if (animFrameId) cancelAnimationFrame(animFrameId);
+    if (activeStream) {
+      activeStream.getTracks().forEach(track => track.stop());
+      activeStream = null;
+    }
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
     }

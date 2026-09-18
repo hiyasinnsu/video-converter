@@ -54,7 +54,7 @@
         </div>
 
         <div class="preview-wrapper">
-          <video id="sourceVideo" playsinline muted controls class="video-preview"></video>
+          <video id="sourceVideo" playsinline webkit-playsinline muted controls class="video-preview"></video>
         </div>
 
         <hr class="divider">
@@ -124,8 +124,8 @@
           <div class="speed-select-group">
             <label for="speedSelect">変換速度:</label>
             <select id="speedSelect">
-              <option value="1.0">等速 (1.0x - 最高安定)</option>
-              <option value="1.5" selected>高速 (1.5x - おすすめ)</option>
+              <option value="1.0" selected>等速 (1.0x - 最高安定・推奨)</option>
+              <option value="1.5">高速 (1.5x)</option>
               <option value="2.0">超高速 (2.0x)</option>
             </select>
           </div>
@@ -180,7 +180,7 @@
         </div>
 
         <div class="preview-wrapper">
-          <video id="resultVideo" playsinline controls class="video-preview"></video>
+          <video id="resultVideo" playsinline webkit-playsinline controls class="video-preview"></video>
         </div>
 
         <div class="action-buttons">
