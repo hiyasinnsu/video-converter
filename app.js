@@ -344,13 +344,20 @@
     const targetWidth = makeEven(parseInt(targetWidthInput.value, 10) || 640);
     const targetHeight = makeEven(parseInt(targetHeightInput.value, 10) || 360);
     const targetBitrateKbps = parseInt(bitrateInput.value, 10) || 1200;
-    const targetBitrateBps = targetBitrateKbps * 1000;
     
     // 【修正理由】0.1xや0.25xなどの超スロー再生時はブラウザ仕様で音声が停止するため、0.3未満は自動的に映像のみで処理するよう修正。またデフォルト速度を1.0xに変更。
     // const keepAudio = keepAudioCheckbox.checked;
     // const playbackSpeed = parseFloat(speedSelect.value) || 1.5;
     const playbackSpeed = parseFloat(speedSelect.value) || 1.0;
     const keepAudio = keepAudioCheckbox.checked && (playbackSpeed >= 0.3);
+
+    // 【修正理由】0.25xなどのスロー再生時は動画全体の秒数が何倍にも引き伸ばされるため、同じビットレートだとファイルサイズが何倍にも肥大化してしまう。そのため速度に応じて実効ビットレートを自動調整し、スロー時でもサイズ増加を防ぐ。
+    // const targetBitrateBps = targetBitrateKbps * 1000;
+    let effectiveBitrateBps = targetBitrateKbps * 1000;
+    if (playbackSpeed < 1.0) {
+      effectiveBitrateBps = Math.round(effectiveBitrateBps * playbackSpeed);
+      if (effectiveBitrateBps < 150000) effectiveBitrateBps = 150000; // 最低150kbps保証
+    }
 
     const mimeType = getSupportedMimeType();
     if (!mimeType) {
@@ -377,7 +384,17 @@
     ctx.imageSmoothingQuality = 'high';
 
     // 映像ストリーム
-    const canvasStream = renderCanvas.captureStream(30);
+    // 【修正理由】canvas.captureStream(30)の固定タイマーだと描画タイミングとズレてコマ落ち・カクつき（ジッター）が発生するため、手動同期モード（captureStream(0) + requestFrame）を採用。
+    // const canvasStream = renderCanvas.captureStream(30);
+    let canvasStream;
+    let videoTrack = null;
+    try {
+      canvasStream = renderCanvas.captureStream(0);
+      videoTrack = canvasStream.getVideoTracks()[0];
+    } catch (e) {
+      canvasStream = renderCanvas.captureStream(30);
+      videoTrack = null;
+    }
 
     // 音声ストリームの取得と合成
     let combinedStream = canvasStream;
@@ -419,7 +436,7 @@
     // MediaRecorder設定
     const recorderOptions = {
       mimeType: mimeType,
-      videoBitsPerSecond: targetBitrateBps
+      videoBitsPerSecond: effectiveBitrateBps
     };
 
     try {
@@ -450,6 +467,11 @@
       if (!isConverting) return;
 
       ctx.drawImage(sourceVideo, 0, 0, targetWidth, targetHeight);
+      
+      // 完全同期フレームリクエスト（カクつき解消）
+      if (videoTrack && typeof videoTrack.requestFrame === 'function') {
+        videoTrack.requestFrame();
+      }
 
       // 進捗更新
       const current = sourceVideo.currentTime;
@@ -465,21 +487,19 @@
         return;
       }
 
-      if ('requestVideoFrameCallback' in sourceVideo) {
-        sourceVideo.requestVideoFrameCallback(renderLoop);
-      } else {
-        animFrameId = requestAnimationFrame(renderLoop);
-      }
+      // 【修正理由】requestVideoFrameCallbackのみに頼るとスロー時（0.25x）にフレーム供給頻度が7.5fps等に落ちてカクカクになるため、常に滑らかなrequestAnimationFrameでフレームを同期描画しジッターを防ぐ
+      // if ('requestVideoFrameCallback' in sourceVideo) {
+      //   sourceVideo.requestVideoFrameCallback(renderLoop);
+      // } else {
+      //   animFrameId = requestAnimationFrame(renderLoop);
+      // }
+      animFrameId = requestAnimationFrame(renderLoop);
     }
 
     sourceVideo.onplay = () => {
       isPlaying = true;
       mediaRecorder.start(500); // 500ms単位でチャンク化
-      if ('requestVideoFrameCallback' in sourceVideo) {
-        sourceVideo.requestVideoFrameCallback(renderLoop);
-      } else {
-        animFrameId = requestAnimationFrame(renderLoop);
-      }
+      animFrameId = requestAnimationFrame(renderLoop);
     };
 
     sourceVideo.onended = () => {
