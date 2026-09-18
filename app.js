@@ -62,6 +62,7 @@
   let mediaRecorder = null;
   let recordedChunks = [];
   let animFrameId = null;
+  let videoCallbackId = null;
   let activeStream = null;
   let audioContext = null;
   let audioDestination = null;
@@ -456,6 +457,11 @@
       finishConversion(mimeType);
     };
 
+    // スロー倍速時の1コマあたり均等フレーム数（例: 0.25xなら4フレーム均等に記録し、間隔のバラつきを根絶）
+    const repeatFramesPerSourceFrame = (playbackSpeed < 1.0)
+      ? Math.max(1, Math.round(1 / playbackSpeed))
+      : 1;
+
     // 再生設定と描画ループ開始
     sourceVideo.currentTime = 0;
     sourceVideo.playbackRate = playbackSpeed;
@@ -468,9 +474,11 @@
 
       ctx.drawImage(sourceVideo, 0, 0, targetWidth, targetHeight);
       
-      // 完全同期フレームリクエスト（カクつき解消）
+      // 完全等間隔フレームリクエスト: 1コマ更新ごとにきっかり指定回数だけフレームをエンコーダーへ送信
       if (videoTrack && typeof videoTrack.requestFrame === 'function') {
-        videoTrack.requestFrame();
+        for (let i = 0; i < repeatFramesPerSourceFrame; i++) {
+          videoTrack.requestFrame();
+        }
       }
 
       // 進捗更新
@@ -487,19 +495,23 @@
         return;
       }
 
-      // 【修正理由】requestVideoFrameCallbackのみに頼るとスロー時（0.25x）にフレーム供給頻度が7.5fps等に落ちてカクカクになるため、常に滑らかなrequestAnimationFrameでフレームを同期描画しジッターを防ぐ
-      // if ('requestVideoFrameCallback' in sourceVideo) {
-      //   sourceVideo.requestVideoFrameCallback(renderLoop);
-      // } else {
-      //   animFrameId = requestAnimationFrame(renderLoop);
-      // }
-      animFrameId = requestAnimationFrame(renderLoop);
+      // 【修正理由】ブラウザの画面描画タイマー（requestAnimationFrame）に依存すると動画デコードのブレでコマごとの滞在時間がバラバラになるため、動画のコマ提示に厳密同期するrequestVideoFrameCallbackを最優先で使用
+      // animFrameId = requestAnimationFrame(renderLoop);
+      if ('requestVideoFrameCallback' in sourceVideo) {
+        videoCallbackId = sourceVideo.requestVideoFrameCallback(renderLoop);
+      } else {
+        animFrameId = requestAnimationFrame(renderLoop);
+      }
     }
 
     sourceVideo.onplay = () => {
       isPlaying = true;
       mediaRecorder.start(500); // 500ms単位でチャンク化
-      animFrameId = requestAnimationFrame(renderLoop);
+      if ('requestVideoFrameCallback' in sourceVideo) {
+        videoCallbackId = sourceVideo.requestVideoFrameCallback(renderLoop);
+      } else {
+        animFrameId = requestAnimationFrame(renderLoop);
+      }
     };
 
     sourceVideo.onended = () => {
@@ -519,6 +531,10 @@
     isConverting = false;
     sourceVideo.pause();
     if (animFrameId) cancelAnimationFrame(animFrameId);
+    if (videoCallbackId && 'cancelVideoFrameCallback' in sourceVideo) {
+      sourceVideo.cancelVideoFrameCallback(videoCallbackId);
+      videoCallbackId = null;
+    }
     if (activeStream) {
       activeStream.getTracks().forEach(track => track.stop());
       activeStream = null;
@@ -533,6 +549,10 @@
     isConverting = false;
     sourceVideo.pause();
     if (animFrameId) cancelAnimationFrame(animFrameId);
+    if (videoCallbackId && 'cancelVideoFrameCallback' in sourceVideo) {
+      sourceVideo.cancelVideoFrameCallback(videoCallbackId);
+      videoCallbackId = null;
+    }
     if (activeStream) {
       activeStream.getTracks().forEach(track => track.stop());
       activeStream = null;
