@@ -45,6 +45,11 @@
   const afterSizeEl = document.getElementById('afterSize');
   const savingsPercentEl = document.getElementById('savingsPercent');
 
+  const fileNameInput = document.getElementById('fileNameInput');
+  const fileExtBadge = document.getElementById('fileExtBadge');
+  const resultFileNameInput = document.getElementById('resultFileNameInput');
+  const resultFileExtBadge = document.getElementById('resultFileExtBadge');
+
   // --- 状態管理 ---
   let originalFile = null;
   let originalVideoUrl = null;
@@ -62,8 +67,26 @@
   let audioDestination = null;
   let audioSourceNode = null;
   let outputBlobUrl = null;
+  let currentExtension = 'mp4';
 
   // --- ユーティリティ関数 ---
+  function sanitizeFileName(name) {
+    // OSで禁止されている文字 \ / : * ? " < > | を除去
+    return name.replace(/[\\/:*?"<>|]/g, '').trim();
+  }
+
+  function updateDownloadFileName() {
+    let rawName = resultFileNameInput.value || fileNameInput.value || '';
+    let sanitized = sanitizeFileName(rawName);
+    if (!sanitized) {
+      sanitized = 'compressed_video';
+    }
+    // ユーザーが手動で拡張子を入力した場合の二重拡張子（.mp4.mp4等）を防止
+    sanitized = sanitized.replace(new RegExp(`\\.${currentExtension}$`, 'i'), '');
+    const finalName = `${sanitized}.${currentExtension}`;
+    downloadLink.download = finalName;
+  }
+
   function formatBytes(bytes, decimals = 1) {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -171,6 +194,19 @@
       if (initialBitrate < 400) initialBitrate = 400;
       setBitrate(initialBitrate);
 
+      // ファイル名の初期設定（元ファイル名 + _light）
+      const defaultBaseName = file.name.replace(/\.[^/.]+$/, '') || 'video';
+      const initialFileName = `${defaultBaseName}_light`;
+      fileNameInput.value = initialFileName;
+      resultFileNameInput.value = initialFileName;
+
+      // 拡張子バッジの初期表示
+      const mime = getSupportedMimeType();
+      currentExtension = mime.includes('mp4') ? 'mp4' : 'webm';
+      fileExtBadge.textContent = `.${currentExtension}`;
+      resultFileExtBadge.textContent = `.${currentExtension}`;
+      updateDownloadFileName();
+
       // UI切り替え
       uploadCard.style.display = 'none';
       settingsCard.style.display = 'block';
@@ -178,6 +214,17 @@
       progressCard.style.display = 'none';
     };
   }
+
+  // --- ファイル名入力連動 ---
+  fileNameInput.addEventListener('input', () => {
+    resultFileNameInput.value = fileNameInput.value;
+    updateDownloadFileName();
+  });
+
+  resultFileNameInput.addEventListener('input', () => {
+    fileNameInput.value = resultFileNameInput.value;
+    updateDownloadFileName();
+  });
 
   // --- 解像度パラメータ連動 ---
   targetWidthInput.addEventListener('input', () => {
@@ -492,9 +539,15 @@
     resultVideo.src = outputBlobUrl;
 
     // ダウンロードボタン
-    const baseName = originalFile.name.replace(/\.[^/.]+$/, '');
+    currentExtension = extension;
+    fileExtBadge.textContent = `.${currentExtension}`;
+    resultFileExtBadge.textContent = `.${currentExtension}`;
     downloadLink.href = outputBlobUrl;
-    downloadLink.download = `${baseName}_light.${extension}`;
+    
+    // 【修正理由】ファイル名を自由に変更できるようにするため、固定ファイル名指定から updateDownloadFileName() 呼び出しに変更
+    // const baseName = originalFile.name.replace(/\.[^/.]+$/, '');
+    // downloadLink.download = `${baseName}_light.${extension}`;
+    updateDownloadFileName();
 
     // 画面切り替え
     progressCard.style.display = 'none';

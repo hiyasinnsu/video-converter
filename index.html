@@ -131,6 +131,15 @@
           </div>
         </div>
 
+        <!-- 保存ファイル名設定 -->
+        <div class="setting-group">
+          <label class="setting-title" for="fileNameInput">📝 保存ファイル名</label>
+          <div class="filename-input-group">
+            <input type="text" id="fileNameInput" class="filename-input" placeholder="動画のファイル名" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <span class="file-ext-badge" id="fileExtBadge">.mp4</span>
+          </div>
+        </div>
+
         <!-- 変換開始ボタン -->
         <div class="action-buttons">
           <button type="button" id="startBtn" class="btn-primary">
@@ -181,6 +190,15 @@
 
         <div class="preview-wrapper">
           <video id="resultVideo" playsinline webkit-playsinline controls class="video-preview"></video>
+        </div>
+
+        <!-- 完了画面でのファイル名変更 -->
+        <div class="setting-group filename-result-group">
+          <label class="setting-title" for="resultFileNameInput">📝 保存ファイル名</label>
+          <div class="filename-input-group">
+            <input type="text" id="resultFileNameInput" class="filename-input" placeholder="動画のファイル名" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <span class="file-ext-badge" id="resultFileExtBadge">.mp4</span>
+          </div>
         </div>
 
         <div class="action-buttons">
