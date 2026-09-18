@@ -60,10 +60,13 @@
   - テスト動画（1080p, 4秒, 音声付き）の生成・配備
   - JavaScript構文チェック（Syntax OK）
   - 通信量ゼロ（外部リクエストなし、オフライン動作可）の確認
-- [x] GitHub Pages公開の準備:
+- [x] GitHub Pages公開の準備・プッシュ:
   - Gitリポジトリ初期化（`git init`）& コミット完了（`main` ブランチ）
+  - リモート `origin`（https://github.com/hiyasinnsu/video-converter.git）の追加
+  - GitHub Actions デプロイワークフロー（`.github/workflows/deploy.yml`）の追加
+  - GitHubへのプッシュ完了（`git push -u origin main`）
   - `.nojekyll` の配置
-  - README.md に詳細なGitHub Pages公開手順を記載
+  - README.md に詳細なGitHub Pages公開手順・リンクを記載
 - [x] 検証結果のウォークスルー作成（walkthrough.md）
 
 ## 5. エラー履歴と対策
