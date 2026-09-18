@@ -15,42 +15,11 @@
 
 ---
 
-## 🚀 GitHub Pages での公開手順
+### 公開URL (GitHub Pages)
+👉 **https://hiyasinnsu.github.io/video-converter/**
 
-このアプリは静的ファイル（HTML / CSS / JavaScript）のみで構築されているため、GitHub Pages を使って**完全無料・サーバー契約不要**で公開できます。
-
-### 手順 1. GitHub 上にリポジトリを作成
-1. [GitHub](https://github.com/) にログインし、右上の「＋」→「New repository」をクリックします。
-2. リポジトリ名を入力します（例: `video-converter`）。
-3. 「Public」を選択し、「Create repository」をクリックします。
-
-### 手順 2. ローカルからプッシュ
-ターミナル（PowerShell等）で以下のコマンドを実行します：
-
-```bash
-# ファイルをステージングしてコミット
-git add .
-git commit -m "Initial commit: Video converter web app"
-
-# mainブランチに変更
-git branch -M main
-
-# リモートリポジトリのURLを設定（ユーザー名とリポジトリ名はご自身のものに置き換えてください）
-git remote add origin https://github.com/<あなたのGitHubユーザー名>/<リポジトリ名>.git
-
-# プッシュ
-git push -u origin main
-```
-
-### 手順 3. GitHub Pages の有効化
-1. GitHubの該当リポジトリのページを開き、上部メニューの **「Settings」**（設定）をクリック。
-2. 左メニューの **「Pages」** をクリック。
-3. **「Build and deployment」** の **「Source」** で **「Deploy from a branch」** を選択。
-4. **「Branch」** を **`main`**、フォルダを **`/ (root)`** に指定して **「Save」** をクリック。
-5. 数分待つと、上部に以下のような公開URLが表示されます：
-   `https://<あなたのGitHubユーザー名>.github.io/<リポジトリ名>/`
-
-これでスマホのSafariやChromeから上記URLにアクセスするだけで、いつでもどこでも通信量ゼロで動画軽量化が利用できます！
+### リポジトリ
+👉 **https://github.com/hiyasinnsu/video-converter**
 
 ---
 
